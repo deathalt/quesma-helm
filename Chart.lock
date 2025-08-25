@@ -1,0 +1,9 @@
+dependencies:
+- name: opensearch
+  repository: https://opensearch-project.github.io/helm-charts/
+  version: 3.1.0
+- name: opensearch-dashboards
+  repository: https://opensearch-project.github.io/helm-charts/
+  version: 3.1.0
+digest: sha256:62032e4fe46c894ee0b64c0dc9313ed587bd58debaa4b4fe0a25abb0caccf967
+generated: "2025-08-19T17:04:26.309241+03:00"
