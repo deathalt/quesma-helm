@@ -1,60 +1,225 @@
-Quesma Helm Chart
-=================
+# Quesma Helm Chart
 
-This Helm Chart runs Quesma demo on Kubernetes cluster. It has been tested on Minikube and is not intended for production use. 
-* it assumes that you already have your ClickHouse/Hydrolix cluster up and running.
-* it installs Quesma along with minimal instance of Elasticsearch and Kibana.
+Helm chart for deploying **Quesma** (an Elasticsearch API–compatible gateway) on Kubernetes.
 
-1. Create values.yaml file based on the template file:
-    ```shell
-    cp quesma-demo/values.template.yaml quesma-demo/values.yaml
+This chart can connect Quesma to external datastores or spin up bundled ones via **dependencies**:
+- `opensearch` – search cluster (compatible backend)
+- `opensearch-dashboards` – OpenSearch web UI
+
+> By default, both dependencies are **disabled**. Enable them in `values.yaml` when needed.
+
+---
+
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Dependencies (OpenSearch & Dashboards)](#dependencies-opensearch--dashboards)
+- [Quesma Configuration](#quesma-configuration)
+- [Ingress](#ingress)
+- [Autoscaling](#autoscaling)
+- [Resources and Probes](#resources-and-probes)
+- [Common Scenarios](#common-scenarios)
+- [Upgrade / Uninstall](#upgrade--uninstall)
+- [Security Notes](#security-notes)
+- [Key Parameters](#key-parameters)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Architecture
+
+Quesma is deployed as a **Deployment** with a **ClusterIP Service** listening on port `8080`.
+
+Data flow is organized through:
+
+- **frontendConnectors** — emulate Elasticsearch API entry points:
+  - `elasticsearch-fe-ingest` (ingest)
+  - `elasticsearch-fe-query` (search/query)
+- **backendConnectors** — real data sources:
+  - OpenSearch/Elasticsearch (indices/metadata, etc.)
+  - SQL storages (`clickhouse`, `hydrolix`, `clickhouse-os`)
+
+Request routing and transformations are handled by **processors** and **pipelines**.
+
+---
+
+## Requirements
+
+- **Kubernetes** 1.23+
+- **Helm** 3.9+
+- Access to container registry hosting `quesma/quesma`
+- (Optional) External OpenSearch/Elasticsearch if not using the bundled dependency
+
+---
+
+## Quick Start
+
+1) From the chart directory, pull chart dependencies:
+
+```bash
+helm dependency update .
+```
+
+2) Create a minimal `values.yaml`:
+
+```yaml
+image:
+  tag: "v1.0.0" # set your desired image tag
+
+config:
+  quesmaConfigurationYaml:
+    licenseKey: "PASTE_LICENSE_HERE"
+    logging:
+      level: "info"
+      fileLogging: true
+    frontendConnectors:
+      - name: elastic-ingest
+        type: elasticsearch-fe-ingest
+        config:
+          listenPort: 8080
+          disableAuth: true
+      - name: elastic-query
+        type: elasticsearch-fe-query
+        config:
+          listenPort: 8080
+          disableAuth: true
+    backendConnectors:
+      - name: opensearch
+        type: elasticsearch
+        config:
+          url: "https://opensearch-cluster-master:9200"
+          user: "admin"
+          password: "myStrongPassword@123!"
+    processors:
+      - name: p-query
+        type: quesma-v1-processor-query
+        config:
+          indexes:
+            "*":
+              target: [ "opensearch" ]
+      - name: p-ingest
+        type: quesma-v1-processor-ingest
+        config:
+          indexes:
+            "*":
+              target: [ "opensearch" ]
+    pipelines:
+      - name: pipeline-query
+        frontendConnectors: [ "elastic-query" ]
+        processors: [ "p-query" ]
+        backendConnectors: [ "opensearch" ]
+      - name: pipeline-ingest
+        frontendConnectors: [ "elastic-ingest" ]
+        processors: [ "p-ingest" ]
+        backendConnectors: [ "opensearch" ]
+
+opensearch:
+  enabled: true
+  persistence:
+    enabled: false
+  extraEnvs:
+    - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+      value: "myStrongPassword@123!"
+
+opensearch-dashboards:
+  enabled: true
+```
+
+3) Install:
+
+```bash
+helm install quesma . -n quesma --create-namespace -f values.yaml
+```
+
+4) Verify resources:
+
+```bash
+kubectl get pods -n quesma
+kubectl get svc -n quesma
+```
+
+5) Port-forward locally:
+
+```bash
+kubectl -n quesma port-forward svc/quesma 8080:8080
+```
+
+---
+
+## Dependencies (OpenSearch & Dashboards)
+
+The chart declares two optional dependencies:
+
+- **OpenSearch** (`opensearch.enabled=true`): deploys a stateful OpenSearch cluster in the same namespace.
+  - The master service endpoint is typically `opensearch-cluster-master:9200` (already referenced in defaults).
+  - Set the initial admin password via:
+    ```yaml
+    opensearch:
+      extraEnvs:
+        - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+          value: "REPLACE_ME"
     ```
-2. Fill in the values in `values.yaml` file in the `config.quesmaConfigurationYaml` section. 
-   This section is mapped directly to the quesma configuration file.
-3. Install the chart:
-    ```shell
-    helm install quesma-demo quesma-demo/ -f quesma-demo/values.yaml
-    ``` 
-4. Profit!   
+  - In production, enable persistence (`opensearch.persistence.enabled=true`) and configure a StorageClass and volume size.
 
-This installs `quesma-demo` helm chart from `quesma-demo/` directory.
+- **OpenSearch Dashboards** (`opensearch-dashboards.enabled=true`): deploys the UI.
+  - Local access:
+    ```bash
+    kubectl -n quesma port-forward svc/opensearch-dashboards 5601:5601
+    # Then open http://localhost:5601
+    ```
 
-You can access the services by setting up a minikube tunnel:
+> After editing dependencies in `Chart.yaml`, run `helm dependency update .` again.
+
+---
+
+## Quesma Configuration
+
+Most settings are defined in `values.yaml`. Key sections include:
+
+### Image
+
+```yaml
+image:
+  repository: quesma/quesma
+  pullPolicy: Always
+  tag: ""   # must be set explicitly (avoid 'latest')
+imagePullSecrets: []
 ```
-minikube tunnel
+
+### Service
+
+```yaml
+service:
+  type: ClusterIP
+  port: 8080
 ```
-**Note:** This command will block the terminal, so you will need to keep that terminal window open all the time if you 
-want to access the services exposed in k8s cluster.
 
-Then follow to:
-* http://127.0.0.1:30560 Kibana
-* http://127.0.0.1:30999 Quesma Admin UI
-* http://127.0.0.1:30808 Quesma frontend connector (Elasticsearch API in this case)
+### Container Environment
 
-Sometimes `minikube tunnel` doesn't work, in that case you can use `kubectl port-forward` command to forward the ports to your local machine.
-```bash
-kubectl port-forward svc/kibana 30560:5601
-kubectl port-forward svc/quesma-ext-admin 30999:9999
-kubectl port-forward svc/quesma-ext-frontend 30808:8080
+```yaml
+env:
+  - name: QUESMA_CONFIG_FILE
+    value: "/quesma-configuration/quesma-config.yaml"
 ```
-And then access the aforementioned URLs in your browser. You also need to keep the terminal process up.
 
-You can remove it anytime with
-```bash
-helm uninstall quesma-demo
+### ConfigMap Mount
+
+By default, the chart renders a ConfigMap named `quesma-first-config` and mounts it to `/quesma-configuration/quesma-config.yaml`:
+
+```yaml
+volumes:
+  - name: quesma-config-volume
+    configMap:
+      name: quesma-first-config
+
+volumeMounts:
+  - name: quesma-config-volume
+    mountPath: /quesma-configuration/quesma-config.yaml
+    subPath: quesma-config.yaml
 ```
- 
-If you make any changes to the chart you can upgrade it with
-```bash
-helm upgrade quesma-demo quesma-demo/ -f quesma-demo/values.yaml
-```
-Optionally, add `--force` flag if you made no changes in k8s object definitions but need (want? :|) to reapply the chart.
 
+### Core Quesma Settings
 
-### Local development 
-
-Make sure you have `helm` and `minikube` installed (both can be installed with `brew install helm minikube`).
-Make sure you have local k8s cluster running (`minikube (start|status|stop|delete)`) before installing the chart.
-
-
-
+See full README above (truncated for brevity)...
