@@ -4,10 +4,15 @@ metadata:
   name: {{ include "quesma.fullname" . }}
   labels:
     {{- include "quesma.labels" . | nindent 4 }}
+  {{- $svc := default (dict) .Values.service -}}
+  {{- with (index $svc "annotations") }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ default "ClusterIP" (index $svc "type") }}
   ports:
-    - port: {{ .Values.service.port }}
+    - port: {{ default 8080 (index $svc "port") }}
       targetPort: http
       protocol: TCP
       name: http

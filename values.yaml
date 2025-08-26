@@ -5,7 +5,114 @@ image:
   pullPolicy: Always
   tag: "" # It's set in `deployment.yaml` template if empty via .Chart.AppVersion
 
-# --- Service, ingress, resources, probes, autoscaling, etc. stay unchanged ---
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 1
+
+# deploymentStrategy:
+#   type: Recreate
+#   rollingUpdate: ~
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+  adminPort: 9999
+  adminTargetPort: 9999
+
+
+ingress:
+  enabled: false
+  # className: "nginx"
+  # annotations: {}
+  # hosts:
+  #   - host: "quesma.example.com"
+  #     paths:
+  #       - path: /
+  #         pathType: Prefix
+  # tls: []
+  # - secretName: quesma-tls
+  #   hosts: ["quesma.example.com"]
+
+ingressAdmin:
+  enabled: false
+  # className: "nginx"
+  # annotations: {}
+  # hosts:
+  #   - host: "quesma-admin.example.com"
+  #     paths:
+  #       - path: /
+  #         pathType: Prefix
+  # tls: []
+  # - secretName: quesma-admin-tls
+  #   hosts: ["quesma-admin.example.com"]
+
+ingressFrontend:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: "quesma-frontend.example.com"
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+livenessProbe:
+  tcpSocket:
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+readinessProbe:
+  tcpSocket:
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
 
 # IMPORTANT: The main ConfigMap volume is now defined in the template (not here).
 # Use these ONLY for adding extra volumes/mounts in addition to the config volume.

@@ -5,34 +5,41 @@ metadata:
   labels:
     {{- include "quesma.labels" . | nindent 4 }}
 spec:
+  {{- $stype := default "Recreate" .Values.deploymentStrategy.type }}
   strategy:
-    type: RollingUpdate
+    type: {{ $stype }}
+    {{- if and (eq $stype "RollingUpdate") (.Values.deploymentStrategy.rollingUpdate) }}
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      {{- toYaml .Values.deploymentStrategy.rollingUpdate | nindent 6 }}
+    {{- end }}
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
       {{- include "quesma.selectorLabels" . | nindent 6 }}
+
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
+        {{- /* These MUST include the selector labels */}}
+        {{- include "quesma.selectorLabels" . | nindent 8 }}
+        {{- /* Optionally include broader chart labels */}}
         {{- include "quesma.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "quesma.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:

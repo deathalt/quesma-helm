@@ -2,12 +2,14 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "quesma.fullname" . }}-admin
-{{/*  labels:*/}}
-{{/*    {{- include "quesma.labels" . | nindent 4 }}*/}}
+  labels:
+    {{- include "quesma.labels" . | nindent 4 }}
 spec:
-  type: ClusterIP
+  type: {{ default "ClusterIP" (index (default (dict) .Values.service) "type") }}
   ports:
-    - port: 9999
-      targetPort: 9999
+    - name: admin
+      port: {{ default 9999 (index (default (dict) .Values.service) "adminPort") }}
+      targetPort: {{ default 9999 (index (default (dict) .Values.service) "adminTargetPort") }}
+      protocol: TCP
   selector:
     {{- include "quesma.selectorLabels" . | nindent 4 }}
