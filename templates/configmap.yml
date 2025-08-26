@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: quesma-first-config
+  name: {{ include "quesma.fullname" . }}-config
   labels:
     app: {{ .Release.Name }}-quesma
 data:
