@@ -55,14 +55,21 @@ spec:
             {{- toYaml .Values.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- with .Values.volumeMounts }}
           volumeMounts:
+            # Mount the generated ConfigMap with the rendered Quesma config
+            - name: quesma-config-volume
+              mountPath: /quesma-configuration/quesma-config.yaml
+              subPath: quesma-config.yaml
+            {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
-          {{- end }}
-      {{- with .Values.volumes }}
+            {{- end }}
       volumes:
+        - name: quesma-config-volume
+          configMap:
+            name: {{ include "quesma.fullname" . }}-config
+        {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
