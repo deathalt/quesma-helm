@@ -3,7 +3,27 @@ entries:
   quesma:
   - apiVersion: v2
     appVersion: 1.1.19
-    created: "2025-08-25T13:49:24.980682+03:00"
+    created: "2025-08-26T13:13:22.756825+03:00"
+    dependencies:
+    - condition: opensearch.enabled
+      name: opensearch
+      repository: https://opensearch-project.github.io/helm-charts/
+      version: 3.1.0
+    - condition: opensearch-dashboards.enabled
+      name: opensearch-dashboards
+      repository: https://opensearch-project.github.io/helm-charts/
+      version: 3.1.0
+    description: A Helm chart for deploying production ready Quesma with Opensearch
+      and Opensearch Dashboards
+    digest: f66c2b5b1014a1b2db5069e0c9e6425b456d82ac0da3322a098e1d4f50a2882a
+    name: quesma
+    type: application
+    urls:
+    - quesma-0.0.2.tgz
+    version: 0.0.2
+  - apiVersion: v2
+    appVersion: 1.1.19
+    created: "2025-08-26T13:13:22.753774+03:00"
     dependencies:
     - condition: opensearch.enabled
       name: opensearch
@@ -21,4 +41,4 @@ entries:
     urls:
     - quesma-0.0.1.tgz
     version: 0.0.1
-generated: "2025-08-25T13:49:24.978412+03:00"
+generated: "2025-08-26T13:13:22.750814+03:00"
